@@ -129,10 +129,17 @@ class PlaidConnector:
         if not self.is_configured():
             return {"added": [], "modified": [], "removed": [], "next_cursor": cursor}
 
-        request = TransactionsSyncRequest(
-            access_token=access_token,
-            cursor=cursor,
-        )
+        # The Plaid SDK requires cursor to be omitted (not None) on the
+        # first sync. Passing cursor=None raises a validation error.
+        if cursor:
+            request = TransactionsSyncRequest(
+                access_token=access_token,
+                cursor=cursor,
+            )
+        else:
+            request = TransactionsSyncRequest(
+                access_token=access_token,
+            )
         response = self.client.transactions_sync(request)
 
         added = [self._map_transaction(t) for t in response["added"]]

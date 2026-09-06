@@ -179,17 +179,19 @@ def plaid_sync():
     """Sync accounts and transactions from all Plaid connections."""
     try:
         from plaid_integration import PlaidConnector
-        
+
         plaid = PlaidConnector()
         if not plaid.is_configured():
             return jsonify({"error": "Plaid not configured"}), 400
-        
+
         cfo = get_cfo()
         result = cfo.sync_plaid_accounts_and_transactions(plaid)
         cfo.close()
-        
+
         return jsonify(result)
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 # CLAUDE AI INTEGRATION

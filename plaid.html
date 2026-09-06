@@ -2,11 +2,13 @@
 <html>
 <head>
     <title>Connect Bank - Personal CFO</title>
+    <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
     <style>
         body { font-family: system-ui; padding: 20px; text-align: center; }
         .container { max-width: 400px; margin: 50px auto; }
         h1 { color: #333; }
-        .status { margin-top: 20px; padding: 20px; background: #f0f0f0; border-radius: 8px; }
+        .status { margin-top: 20px; padding: 20px; background: #f0f0f0; border-radius: 8px; text-align: left; }
+        .status p { margin: 4px 0; }
         a { color: #667eea; text-decoration: none; }
         a:hover { text-decoration: underline; }
     </style>
@@ -15,19 +17,26 @@
     <div class="container">
         <h1>Connect Your Bank</h1>
         <div id="status" class="status">
-            <p>Getting ready...</p>
+            <p>Loading...</p>
         </div>
     </div>
 
     <script>
         const API_BASE = (window.opener && window.opener.location.origin) || window.location.origin || 'https://finance-agent-production-694c.up.railway.app';
 
-        async function init() {
-            try {
-                const status = document.getElementById('status');
-                status.innerHTML = '<p>Fetching Plaid link token...</p>';
+        function log(msg, color) {
+            console.log(msg);
+            const status = document.getElementById('status');
+            const p = document.createElement('p');
+            p.textContent = msg;
+            if (color) p.style.color = color;
+            status.appendChild(p);
+        }
 
-                // Get link token from backend
+        async function initPlaid() {
+            try {
+                log('Requesting link token...');
+
                 const res = await fetch(`${API_BASE}/api/plaid/link-token`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -37,21 +46,83 @@
                 const data = await res.json();
 
                 if (!data.link_token) {
-                    status.innerHTML = `<p style="color: red;">Error: ${data.error || 'No link token'}</p>`;
+                    log('Error: ' + (data.error || 'No link token returned'), 'red');
                     return;
                 }
 
-                // Redirect to Plaid's hosted Link with token
-                status.innerHTML = '<p>Redirecting to Plaid...</p>';
-                window.location.href = `https://sandbox.plaid.com/link?token=${encodeURIComponent(data.link_token)}`;
+                log('Link token received.');
 
+                // Wait for the SDK to define window.Plaid
+                let attempts = 0;
+                while (!window.Plaid && attempts < 20) {
+                    await new Promise(r => setTimeout(r, 250));
+                    attempts++;
+                }
+
+                if (!window.Plaid) {
+                    log('Plaid SDK script did not load (window.Plaid undefined).', 'red');
+                    return;
+                }
+
+                log('Plaid SDK loaded. Opening Link...');
+
+                const handler = Plaid.create({
+                    token: data.link_token,
+                    onSuccess: async (publicToken, metadata) => {
+                        log('Bank selected. Exchanging token...');
+
+                        const exchangeRes = await fetch(`${API_BASE}/api/plaid/exchange`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ public_token: publicToken })
+                        });
+
+                        const exchangeData = await exchangeRes.json();
+
+                        if (exchangeData.error) {
+                            log('Exchange error: ' + exchangeData.error, 'red');
+                            return;
+                        }
+
+                        log('Bank linked! Syncing accounts and transactions...', 'green');
+
+                        const syncRes = await fetch(`${API_BASE}/api/plaid/sync`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' }
+                        });
+                        const syncData = await syncRes.json();
+
+                        if (syncData.error) {
+                            log('Sync error: ' + syncData.error, 'red');
+                        } else {
+                            log(`Synced ${syncData.accounts_synced} accounts, ${syncData.transactions_synced} transactions.`, 'green');
+                        }
+
+                        log('Done. You can close this window.');
+                        if (window.opener) {
+                            setTimeout(() => window.close(), 1500);
+                        }
+                    },
+                    onExit: (err, metadata) => {
+                        if (err) {
+                            log('Plaid exited with error: ' + err.error_message, 'red');
+                        } else {
+                            log('Closed without linking.');
+                        }
+                    },
+                });
+
+                handler.open();
             } catch (e) {
-                document.getElementById('status').innerHTML = `<p style="color: red;">Error: ${e.message}</p>`;
+                log('Unexpected error: ' + e.message, 'red');
             }
         }
 
-        // Start immediately
-        init();
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initPlaid);
+        } else {
+            initPlaid();
+        }
     </script>
 </body>
 </html>

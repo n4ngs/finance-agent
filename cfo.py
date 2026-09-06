@@ -278,11 +278,78 @@ class PersonalCFO:
         )
         self.db.add_transaction(transaction)
     
+    def sync_plaid_accounts_and_transactions(self, plaid_connector) -> Dict[str, Any]:
+        """
+        Sync all Plaid-linked bank accounts and transactions.
+
+        This is called periodically to:
+        1. Fetch all accounts from all Plaid connections
+        2. Update balances
+        3. Fetch new/updated transactions
+        4. Import them into our database
+        """
+        if not plaid_connector.is_configured():
+            return {"error": "Plaid not configured"}
+
+        plaid_items = self.db.get_all_plaid_items()
+        if not plaid_items:
+            return {"accounts_synced": 0, "transactions_synced": 0}
+
+        total_accounts = 0
+        total_transactions = 0
+
+        for item in plaid_items:
+            access_token = item['access_token']
+
+            # Sync accounts and balances
+            accounts = plaid_connector.fetch_accounts(access_token)
+            for acc in accounts:
+                self.db.upsert_plaid_account(
+                    plaid_account_id=acc['plaid_account_id'],
+                    plaid_item_id=item['item_id'],
+                    name=acc['name'],
+                    account_type=acc['account_type'],
+                    balance=acc['balance'],
+                    available_balance=acc['available_balance'],
+                )
+                total_accounts += 1
+
+            # Sync transactions incrementally
+            cursor = item.get('sync_cursor')
+            result = plaid_connector.fetch_transactions(access_token, cursor)
+
+            for txn in result['added'] + result['modified']:
+                transaction = Transaction(
+                    transaction_id=str(uuid.uuid4()),
+                    date=txn['date'],
+                    description=txn['description'],
+                    amount=txn['amount'],
+                    transaction_type=txn['transaction_type'],
+                    category=txn['category'],
+                    account=txn['plaid_account_id'],
+                    merchant=txn.get('merchant'),
+                )
+                self.db.upsert_plaid_transaction(
+                    transaction,
+                    plaid_transaction_id=txn['plaid_transaction_id'],
+                    pending=txn.get('pending', False),
+                )
+                total_transactions += 1
+
+            # Update sync cursor
+            if result.get('next_cursor'):
+                self.db.update_plaid_cursor(item['item_id'], result['next_cursor'])
+
+        return {
+            "accounts_synced": total_accounts,
+            "transactions_synced": total_transactions,
+        }
+
     def _calculate_credit_card_balance(self, accounts: List[Account]) -> float:
         """Calculate total credit card debt."""
         return sum(
-            acc.balance 
-            for acc in accounts 
+            acc.balance
+            for acc in accounts
             if acc.account_type == "credit_card" and acc.balance > 0
         )
 

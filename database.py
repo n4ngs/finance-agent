@@ -248,7 +248,117 @@ class Database:
             )
             for row in rows
         ]
-    
+
+    def upsert_plaid_transaction(self, transaction: Transaction, plaid_transaction_id: str, pending: bool = False):
+        """
+        Insert a transaction from Plaid, skipping if we've already recorded
+        this plaid_transaction_id. Prevents duplicate imports on re-sync.
+        """
+        existing = self.conn.execute(
+            "SELECT transaction_id FROM transactions WHERE plaid_transaction_id = ?",
+            (plaid_transaction_id,)
+        ).fetchone()
+
+        if existing:
+            self.conn.execute("""
+                UPDATE transactions
+                SET amount = ?, description = ?, category = ?, pending = ?
+                WHERE plaid_transaction_id = ?
+            """, (
+                transaction.amount,
+                transaction.description,
+                transaction.category,
+                1 if pending else 0,
+                plaid_transaction_id,
+            ))
+        else:
+            self.conn.execute("""
+                INSERT INTO transactions
+                (transaction_id, date, description, merchant, amount,
+                 transaction_type, category, subcategory, account,
+                 essentiality, source, created_at, plaid_transaction_id, pending)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                transaction.transaction_id,
+                transaction.date,
+                transaction.description,
+                transaction.merchant,
+                transaction.amount,
+                transaction.transaction_type,
+                transaction.category,
+                transaction.subcategory,
+                transaction.account,
+                transaction.essentiality,
+                "plaid",
+                datetime.now().isoformat(),
+                plaid_transaction_id,
+                1 if pending else 0,
+            ))
+        self.conn.commit()
+
+    # PLAID OPERATIONS
+    def save_plaid_item(self, item_id: str, access_token: str, institution_name: Optional[str] = None):
+        """Store a Plaid item (one per linked bank connection)."""
+        self.conn.execute("""
+            INSERT OR REPLACE INTO plaid_items
+            (item_id, access_token, institution_name, status, created_at)
+            VALUES (?, ?, ?, 'active', ?)
+        """, (item_id, access_token, institution_name, datetime.now().isoformat()))
+        self.conn.commit()
+
+    def get_all_plaid_items(self) -> List[Dict[str, Any]]:
+        """Get all linked Plaid bank connections."""
+        rows = self.conn.execute(
+            "SELECT * FROM plaid_items WHERE status = 'active'"
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+    def update_plaid_cursor(self, item_id: str, cursor: str):
+        """Update the sync cursor after fetching transactions."""
+        self.conn.execute("""
+            UPDATE plaid_items
+            SET sync_cursor = ?, last_synced = ?
+            WHERE item_id = ?
+        """, (cursor, datetime.now().isoformat(), item_id))
+        self.conn.commit()
+
+    def upsert_plaid_account(
+        self,
+        plaid_account_id: str,
+        plaid_item_id: str,
+        name: str,
+        account_type: str,
+        balance: float,
+        available_balance: Optional[float],
+    ):
+        """Insert or update an account synced from Plaid."""
+        existing = self.conn.execute(
+            "SELECT account_id FROM accounts WHERE plaid_account_id = ?",
+            (plaid_account_id,)
+        ).fetchone()
+
+        if existing:
+            self.conn.execute("""
+                UPDATE accounts
+                SET current_balance = ?, available_balance = ?, last_updated = ?, confidence = 'confirmed'
+                WHERE plaid_account_id = ?
+            """, (balance, available_balance, datetime.now().isoformat(), plaid_account_id))
+        else:
+            import uuid
+            self.conn.execute("""
+                INSERT INTO accounts
+                (account_id, account_name, account_type, current_balance,
+                 available_balance, include_in_liquidity, last_updated, created_at,
+                 plaid_account_id, plaid_item_id, confidence)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed')
+            """, (
+                str(uuid.uuid4()), name, account_type, balance, available_balance,
+                1 if account_type != "loan" else 0,
+                datetime.now().isoformat(), datetime.now().isoformat(),
+                plaid_account_id, plaid_item_id,
+            ))
+        self.conn.commit()
+
     # GOAL OPERATIONS
     def add_goal(self, goal: Goal):
         """Add a financial goal."""

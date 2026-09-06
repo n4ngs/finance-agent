@@ -10,7 +10,21 @@ CREATE TABLE IF NOT EXISTS accounts (
     include_in_liquidity INTEGER DEFAULT 1,
     last_updated TEXT NOT NULL,
     created_at TEXT NOT NULL,
-    notes TEXT
+    notes TEXT,
+    plaid_account_id TEXT,
+    plaid_item_id TEXT,
+    confidence TEXT DEFAULT 'confirmed'
+);
+
+-- Plaid items (one per bank connection / access_token)
+CREATE TABLE IF NOT EXISTS plaid_items (
+    item_id TEXT PRIMARY KEY,
+    access_token TEXT NOT NULL,
+    institution_name TEXT,
+    sync_cursor TEXT,
+    status TEXT DEFAULT 'active',
+    last_synced TEXT,
+    created_at TEXT NOT NULL
 );
 
 -- Income streams
@@ -56,7 +70,9 @@ CREATE TABLE IF NOT EXISTS transactions (
     essentiality TEXT,
     source TEXT,
     notes TEXT,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    plaid_transaction_id TEXT UNIQUE,
+    pending INTEGER DEFAULT 0
 );
 
 -- Financial goals

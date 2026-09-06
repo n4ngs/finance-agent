@@ -1,12 +1,13 @@
 """
 Personal CFO - REST API
-Simple Flask API for Railway deployment.
+Flask API with web dashboard, Plaid integration, and Claude AI reasoning.
 """
 
 import json
 import os
 from datetime import datetime
-from flask import Flask, jsonify, request, send_file
+from pathlib import Path
+from flask import Flask, jsonify, request
 from cfo import PersonalCFO
 
 app = Flask(__name__, static_folder=None)
@@ -17,6 +18,16 @@ db_path = os.getenv('DATABASE_PATH', os.path.expanduser('~/.personal-cfo/finance
 def get_cfo():
     """Create a new CFO instance per request (thread-safe for SQLite)."""
     return PersonalCFO(db_path)
+
+# WEB DASHBOARD (Root)
+@app.route('/', methods=['GET'])
+def dashboard():
+    """Serve the web dashboard."""
+    dashboard_path = Path(__file__).parent / 'frontend.html'
+    if dashboard_path.exists():
+        with open(dashboard_path, 'r') as f:
+            return f.read()
+    return jsonify({"error": "Dashboard not found"}), 404
 
 @app.route('/health', methods=['GET'])
 def health():
@@ -103,45 +114,10 @@ def record_transaction():
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
-@app.route('/', methods=['GET'])
-def root():
-    """Root endpoint with API documentation."""
-    return jsonify({
-        "service": "Personal CFO API",
-        "version": "1.0.0",
-        "endpoints": {
-            "GET /health": "Health check",
-            "GET /api/status": "Get current financial status",
-            "POST /api/setup": "Initialize financial data",
-            "POST /api/purchase": "Evaluate purchase decision",
-            "POST /api/transaction": "Record a transaction",
-        },
-        "example_setup": {
-            "accounts": [
-                {"name": "Checking", "account_type": "checking", "balance": 5000}
-            ],
-            "income": [
-                {"source": "Salary", "amount": 4200, "frequency": "biweekly", "next_expected_date": "2026-09-18"}
-            ],
-            "obligations": [
-                {"name": "Rent", "category": "housing", "amount": 2000, "due_date": 1, "frequency": "monthly", "priority": "essential"}
-            ],
-            "goals": [
-                {"name": "Emergency Fund", "goal_type": "emergency_fund", "target_amount": 20000, "current_amount": 10000}
-            ],
-            "financial_floor": {
-                "emergency_reserve": 3500,
-                "operating_buffer": 1500
-            }
-        }
-    })
-
-if __name__ == '__main__':
-    port = int(os.getenv('PORT', 5000))
-# PLAID INTEGRATION ENDPOINTS
+# PLAID INTEGRATION
 @app.route('/api/plaid/link-token', methods=['POST'])
 def plaid_link_token():
-    """Generate a Plaid Link token for the frontend."""
+    """Generate a Plaid Link token for OAuth flow."""
     try:
         from plaid_integration import PlaidConnector
         
@@ -159,7 +135,7 @@ def plaid_link_token():
 
 @app.route('/api/plaid/exchange', methods=['POST'])
 def plaid_exchange():
-    """Exchange Plaid's public_token for access_token and store it."""
+    """Exchange public_token for access_token."""
     try:
         from plaid_integration import PlaidConnector
         
@@ -178,7 +154,6 @@ def plaid_exchange():
         if 'error' in result:
             return jsonify(result), 400
         
-        # Store in database
         cfo = get_cfo()
         cfo.db.save_plaid_item(
             item_id=result['item_id'],
@@ -192,7 +167,7 @@ def plaid_exchange():
 
 @app.route('/api/plaid/sync', methods=['POST'])
 def plaid_sync():
-    """Sync accounts and transactions from Plaid."""
+    """Sync accounts and transactions from all Plaid connections."""
     try:
         from plaid_integration import PlaidConnector
         
@@ -208,13 +183,10 @@ def plaid_sync():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# CLAUDE AI INTEGRATION ENDPOINTS
+# CLAUDE AI INTEGRATION
 @app.route('/api/claude/query', methods=['POST'])
 def claude_query():
-    """
-    Ask Claude a financial question.
-    Claude sees your current financial state and reasons about it.
-    """
+    """Ask Claude a financial question with full financial context."""
     try:
         import anthropic
         
@@ -224,39 +196,32 @@ def claude_query():
         if not question:
             return jsonify({"error": "question required"}), 400
         
-        # Get current financial state
         cfo = get_cfo()
         status = cfo.get_status()
         cfo.close()
         
-        # Prepare context for Claude
         context = f"""
-You are a personal financial advisor. The user has shared their financial state with you.
+You are a personal financial advisor. The user has shared their complete financial state.
 
-CURRENT FINANCIAL POSITION:
+FINANCIAL POSITION:
 - Liquid Cash: ${status['liquid_cash']:,.2f}
-- Financial Floor: ${status['financial_floor']['total']:,.2f}
 - Safe to Spend: ${status['safe_to_spend']['total']:,.2f}
-- Upcoming Obligations (30 days): ${status['upcoming_obligations_30d']:,.2f}
-- Number of Active Goals: {status['active_income_streams']}
-- Number of Active Income Streams: {status['active_income_streams']}
+- Financial Floor: ${status['financial_floor']['total']:,.2f}
+- Upcoming Obligations (30d): ${status['upcoming_obligations_30d']:,.2f}
 
-BREAKDOWN OF SAFE TO SPEND:
+BREAKDOWN:
 {json.dumps(status['safe_to_spend']['breakdown'], indent=2)}
 
 USER QUESTION: {question}
 
-Answer the user's question directly and helpfully. Refer to their specific numbers.
-Be concise but thorough. If they're asking about affordability, be clear about whether something is safe.
+Answer directly and concisely. Refer to their specific numbers.
 """
         
         client = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
         message = client.messages.create(
             model="claude-opus-5",
             max_tokens=1024,
-            messages=[
-                {"role": "user", "content": context}
-            ]
+            messages=[{"role": "user", "content": context}]
         )
         
         return jsonify({
@@ -265,17 +230,6 @@ Be concise but thorough. If they're asking about affordability, be clear about w
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-# WEB DASHBOARD
-@app.route('/dashboard', methods=['GET'])
-def dashboard():
-    """Serve the web dashboard."""
-    from pathlib import Path
-    dashboard_path = Path(__file__).parent / 'frontend.html'
-    if dashboard_path.exists():
-        with open(dashboard_path, 'r') as f:
-            return f.read()
-    return jsonify({"error": "Dashboard not found"}), 404
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))

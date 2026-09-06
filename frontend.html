@@ -237,17 +237,29 @@
             <div id="statusIndicator"></div>
         </div>
 
-        <!-- Plaid Integration -->
+        <!-- Manual Setup -->
         <div class="card plaid-section">
-            <h2>Bank Connection</h2>
+            <h2>Setup Your Finances</h2>
             <p style="margin-bottom: 16px; color: #666; font-size: 14px;">
-                Connect your bank account for automatic transaction and balance syncing.
+                Enter your financial data to get started. Plaid integration coming soon.
             </p>
-            <div class="button-group">
-                <button class="button" onclick="startPlaidLink()">Connect Bank</button>
-                <button class="button secondary" onclick="syncPlaid()">Sync Now</button>
-            </div>
-            <div id="plaidStatus"></div>
+            <details style="margin-bottom: 16px;">
+                <summary style="cursor: pointer; color: #667eea; font-weight: 500;">Setup via API (curl command)</summary>
+                <pre style="background: #f3f4f6; padding: 12px; border-radius: 6px; overflow-x: auto; margin-top: 12px; font-size: 12px;">curl -X POST https://finance-agent-production-694c.up.railway.app/api/setup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "accounts": [
+      {"name": "Checking", "account_type": "checking", "balance": 5000}
+    ],
+    "income": [
+      {"source": "Salary", "amount": 4200, "frequency": "biweekly", "next_expected_date": "2026-09-18"}
+    ],
+    "obligations": [
+      {"name": "Rent", "category": "housing", "amount": 2000, "due_date": 1, "frequency": "monthly", "priority": "essential"}
+    ]
+  }'</pre>
+            </details>
+            <div id="plaidStatus" style="color: #999; font-size: 13px;">Plaid integration in progress...</div>
         </div>
 
         <!-- Chat with Claude -->

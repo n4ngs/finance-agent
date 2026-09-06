@@ -8,12 +8,11 @@ COPY . .
 # Install dependencies
 RUN pip install -r requirements.txt
 
-# Create data directory
-RUN mkdir -p /home/railway/.personal-cfo
-
-# Set environment
+# NOTE: DATABASE_PATH is set via Railway's persistent Volume mounted at
+# /data (see: railway volume add --mount-path /data). Without a Volume,
+# anything written here is wiped on every redeploy. DATABASE_PATH is
+# configured as a Railway environment variable, not hardcoded here.
 ENV PYTHONUNBUFFERED=1
-ENV DATABASE_PATH=/home/railway/.personal-cfo/finance.db
 ENV PORT=5000
 
 # Run the Flask API

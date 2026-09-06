@@ -388,7 +388,7 @@
 
                 // Open Plaid in a popup window
                 const redirectUri = `${API_BASE}/plaid-callback`;
-                const plaidUrl = `https://sandbox.plaid.com/auth?client_id=${data.link_token}&response_type=code&state=1&redirect_uri=${encodeURIComponent(redirectUri)}`;
+                const plaidUrl = `https://sandbox.plaid.com/link?token=${data.link_token}&redirect_uri=${encodeURIComponent(redirectUri)}`;
 
                 const popup = window.open(plaidUrl, 'Plaid', 'width=600,height=600');
 

@@ -5,9 +5,8 @@ WORKDIR /app
 # Copy application code
 COPY . .
 
-# No external dependencies needed for Phase 1
-# If Plaid is added later, uncomment:
-# RUN pip install -r requirements.txt
+# Install dependencies
+RUN pip install -r requirements.txt
 
 # Create data directory
 RUN mkdir -p /home/railway/.personal-cfo
@@ -15,6 +14,7 @@ RUN mkdir -p /home/railway/.personal-cfo
 # Set environment
 ENV PYTHONUNBUFFERED=1
 ENV DATABASE_PATH=/home/railway/.personal-cfo/finance.db
+ENV PORT=5000
 
-# Run the application
-CMD ["python3", "main.py"]
+# Run the Flask API
+CMD ["python3", "api.py"]

@@ -1,2 +1,1 @@
-# No external dependencies for Phase 1
-# Uses only Python stdlib: sqlite3, dataclasses, datetime, enum
+flask==3.0.0

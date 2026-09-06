@@ -4,6 +4,6 @@
     "builder": "dockerfile"
   },
   "deploy": {
-    "startCommand": "python3 main.py"
+    "startCommand": "python3 api.py"
   }
 }

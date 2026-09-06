@@ -1,0 +1,31 @@
+# Database and sensitive data
+*.db
+*.db-journal
+finance.db
+test_finance.db
+
+# Plaid config with secrets
+config.json
+!config.example.json
+
+# User data
+~/.personal-cfo/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

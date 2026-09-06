@@ -1,0 +1,17 @@
+{
+  "database": {
+    "path": "~/.personal-cfo/finance.db"
+  },
+  "plaid": {
+    "client_id": "YOUR_CLIENT_ID",
+    "secret": "YOUR_SECRET",
+    "environment": "sandbox"
+  },
+  "defaults": {
+    "financial_floor_emergency": 3500,
+    "financial_floor_operating": 1500,
+    "savings_target_monthly": 750,
+    "investment_target_monthly": 500,
+    "forecast_days": [7, 30, 90]
+  }
+}

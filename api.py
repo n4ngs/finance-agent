@@ -29,6 +29,15 @@ def dashboard():
             return f.read()
     return jsonify({"error": "Dashboard not found"}), 404
 
+@app.route('/plaid-link', methods=['GET'])
+def plaid_link_page():
+    """Serve dedicated Plaid Link page."""
+    plaid_path = Path(__file__).parent / 'plaid.html'
+    if plaid_path.exists():
+        with open(plaid_path, 'r') as f:
+            return f.read()
+    return jsonify({"error": "Plaid page not found"}), 404
+
 @app.route('/health', methods=['GET'])
 def health():
     """Health check endpoint."""

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Connect Bank - Personal CFO</title>
+    <script src="https://cdn.plaid.com/link/v3/stable/link-initialize.js"></script>
+    <style>
+        body { font-family: system-ui; padding: 20px; text-align: center; }
+        .container { max-width: 400px; margin: 50px auto; }
+        h1 { color: #333; }
+        .status { margin-top: 20px; padding: 20px; background: #f0f0f0; border-radius: 8px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Connect Your Bank</h1>
+        <p>Loading Plaid Link...</p>
+        <div id="status" class="status"></div>
+    </div>
+
+    <script>
+        // Get API base from opener window or use current origin
+        const API_BASE = (window.opener && window.opener.location.origin) || window.location.origin || 'https://finance-agent-production-694c.up.railway.app';
+
+        async function initPlaid() {
+            try {
+                // Get link token from backend
+                const res = await fetch(`${API_BASE}/api/plaid/link-token`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: 'user_' + Math.random().toString(36).substr(2, 9) })
+                });
+
+                const data = await res.json();
+
+                if (!data.link_token) {
+                    document.getElementById('status').innerHTML = `<p style="color: red;">Error: ${data.error}</p>`;
+                    return;
+                }
+
+                // Wait for Plaid to load
+                if (!window.Plaid) {
+                    setTimeout(initPlaid, 500);
+                    return;
+                }
+
+                const handler = Plaid.create({
+                    token: data.link_token,
+                    onSuccess: async (publicToken, metadata) => {
+                        document.getElementById('status').innerHTML = '<p style="color: blue;">Exchanging token...</p>';
+
+                        const exchangeRes = await fetch(`${API_BASE}/api/plaid/exchange`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ public_token: publicToken })
+                        });
+
+                        const exchangeData = await exchangeRes.json();
+
+                        if (exchangeData.error) {
+                            document.getElementById('status').innerHTML = `<p style="color: red;">Error: ${exchangeData.error}</p>`;
+                        } else {
+                            document.getElementById('status').innerHTML = '<p style="color: green;"><strong>✓ Success!</strong></p><p>Bank account linked. Syncing transactions...</p>';
+
+                            // Sync transactions
+                            setTimeout(async () => {
+                                const syncRes = await fetch(`${API_BASE}/api/plaid/sync`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' }
+                                });
+                                const syncData = await syncRes.json();
+                                document.getElementById('status').innerHTML += `<p>Synced ${syncData.accounts_synced} accounts, ${syncData.transactions_synced} transactions.</p><p><a href="/" style="color: #667eea;">← Back to Dashboard</a></p>`;
+                            }, 1000);
+                        }
+                    },
+                    onExit: (err, metadata) => {
+                        if (err) {
+                            document.getElementById('status').innerHTML = `<p style="color: red;">Error: ${err.error_message}</p>`;
+                        }
+                    }
+                });
+
+                handler.open();
+            } catch (e) {
+                document.getElementById('status').innerHTML = `<p style="color: red;">Error: ${e.message}</p>`;
+            }
+        }
+
+        // Start as soon as page loads
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initPlaid);
+        } else {
+            initPlaid();
+        }
+    </script>
+</body>
+</html>

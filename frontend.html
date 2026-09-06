@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal CFO - Financial Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .tagline {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .card h2 {
+            font-size: 14px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+
+        .card-value {
+            font-size: 32px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .card-subtitle {
+            font-size: 13px;
+            color: #999;
+        }
+
+        .status-good {
+            color: #10b981;
+        }
+
+        .status-warning {
+            color: #f59e0b;
+        }
+
+        .status-danger {
+            color: #ef4444;
+        }
+
+        .button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .button:hover {
+            background: #5568d3;
+        }
+
+        .button.secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .button.secondary:hover {
+            background: #d0d0d0;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .chat-section {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-top: 30px;
+        }
+
+        .chat-box {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 16px;
+            height: 300px;
+            overflow-y: auto;
+            margin-bottom: 16px;
+        }
+
+        .chat-message {
+            margin-bottom: 12px;
+            padding: 12px;
+            border-radius: 6px;
+            line-height: 1.5;
+        }
+
+        .chat-message.user {
+            background: #dbeafe;
+            color: #1e40af;
+            margin-left: 30px;
+        }
+
+        .chat-message.assistant {
+            background: #f3f4f6;
+            color: #374151;
+            margin-right: 30px;
+        }
+
+        .chat-input-group {
+            display: flex;
+            gap: 12px;
+        }
+
+        .chat-input-group input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .loading {
+            color: #999;
+            font-style: italic;
+        }
+
+        .error {
+            color: #ef4444;
+            padding: 12px;
+            background: #fee2e2;
+            border-radius: 6px;
+            margin-top: 12px;
+        }
+
+        .plaid-section {
+            margin-top: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .section {
+                grid-template-columns: 1fr;
+            }
+
+            .card-value {
+                font-size: 24px;
+            }
+
+            .chat-message {
+                font-size: 13px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Personal CFO</h1>
+            <p class="tagline">Financial Operating System • Powered by Deterministic Math + Claude AI</p>
+        </header>
+
+        <!-- Financial Status -->
+        <div class="section">
+            <div class="card">
+                <h2>Liquid Cash</h2>
+                <div class="card-value" id="liquidCash">Loading...</div>
+                <div class="card-subtitle">Available funds across all accounts</div>
+            </div>
+
+            <div class="card">
+                <h2>Safe to Spend</h2>
+                <div class="card-value" id="safeToSpend">Loading...</div>
+                <div class="card-subtitle">Discretionary capacity right now</div>
+            </div>
+
+            <div class="card">
+                <h2>Financial Floor</h2>
+                <div class="card-value" id="financialFloor">Loading...</div>
+                <div class="card-subtitle">Protected emergency reserve</div>
+            </div>
+        </div>
+
+        <!-- Obligations -->
+        <div class="card" style="margin-bottom: 30px;">
+            <h2>Upcoming Obligations (30 days)</h2>
+            <div class="card-value" id="upcomingObligations">Loading...</div>
+            <div class="card-subtitle">Bills, rent, subscriptions due soon</div>
+            <div id="statusIndicator"></div>
+        </div>
+
+        <!-- Plaid Integration -->
+        <div class="card plaid-section">
+            <h2>Bank Connection</h2>
+            <p style="margin-bottom: 16px; color: #666; font-size: 14px;">
+                Connect your bank account for automatic transaction and balance syncing.
+            </p>
+            <div class="button-group">
+                <button class="button" onclick="startPlaidLink()">Connect Bank</button>
+                <button class="button secondary" onclick="syncPlaid()">Sync Now</button>
+            </div>
+            <div id="plaidStatus"></div>
+        </div>
+
+        <!-- Chat with Claude -->
+        <div class="chat-section">
+            <h2>Ask Claude</h2>
+            <p style="color: #666; font-size: 14px; margin-bottom: 16px;">
+                Ask Claude AI about your finances. It sees your complete financial state and reasons about affordability, timing, and strategy.
+            </p>
+            <div class="chat-box" id="chatBox"></div>
+            <div class="chat-input-group">
+                <input 
+                    type="text" 
+                    id="chatInput" 
+                    placeholder="Can I spend $500 this weekend? Should I buy a laptop?" 
+                    onkeypress="handleChatKeypress(event)"
+                >
+                <button class="button" onclick="sendChat()">Send</button>
+            </div>
+            <div id="chatError"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+
+        async function loadStatus() {
+            try {
+                const res = await fetch(`${API_BASE}/api/status`);
+                const data = await res.json();
+
+                if (data.error) {
+                    document.getElementById('liquidCash').textContent = 'Setup needed';
+                    return;
+                }
+
+                document.getElementById('liquidCash').textContent = formatCurrency(data.liquid_cash);
+                document.getElementById('safeToSpend').textContent = formatCurrency(data.safe_to_spend.total);
+                document.getElementById('financialFloor').textContent = formatCurrency(data.financial_floor.total);
+                document.getElementById('upcomingObligations').textContent = formatCurrency(data.upcoming_obligations_30d);
+
+                // Status indicator
+                const indicator = document.getElementById('statusIndicator');
+                if (data.safe_to_spend.total > data.liquid_cash * 0.3) {
+                    indicator.innerHTML = '<div style="color: #10b981; margin-top: 12px;">✓ Comfortable - you have good discretionary capacity</div>';
+                } else if (data.safe_to_spend.total > 0) {
+                    indicator.innerHTML = '<div style="color: #f59e0b; margin-top: 12px;">⚠ Tight - approaching obligations period</div>';
+                } else {
+                    indicator.innerHTML = '<div style="color: #ef4444; margin-top: 12px;">⚠ Constrained - obligations exceed safe spending</div>';
+                }
+            } catch (e) {
+                console.error('Error loading status:', e);
+            }
+        }
+
+        function formatCurrency(num) {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 0,
+            }).format(num);
+        }
+
+        async function sendChat() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+
+            if (!message) return;
+
+            // Add user message to chat
+            const chatBox = document.getElementById('chatBox');
+            const userMsg = document.createElement('div');
+            userMsg.className = 'chat-message user';
+            userMsg.textContent = message;
+            chatBox.appendChild(userMsg);
+            input.value = '';
+
+            // Show loading
+            const loadingMsg = document.createElement('div');
+            loadingMsg.className = 'chat-message loading';
+            loadingMsg.textContent = 'Claude is thinking...';
+            chatBox.appendChild(loadingMsg);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            try {
+                const res = await fetch(`${API_BASE}/api/claude/query`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question: message })
+                });
+
+                const data = await res.json();
+                chatBox.removeChild(loadingMsg);
+
+                if (data.error) {
+                    const errorMsg = document.createElement('div');
+                    errorMsg.className = 'chat-message assistant';
+                    errorMsg.textContent = '⚠ Error: ' + data.error + '\n\n(Make sure ANTHROPIC_API_KEY is set in Railway environment variables)';
+                    chatBox.appendChild(errorMsg);
+                } else {
+                    const assistantMsg = document.createElement('div');
+                    assistantMsg.className = 'chat-message assistant';
+                    assistantMsg.textContent = data.answer;
+                    chatBox.appendChild(assistantMsg);
+                }
+                chatBox.scrollTop = chatBox.scrollHeight;
+            } catch (e) {
+                chatBox.removeChild(loadingMsg);
+                const errorMsg = document.createElement('div');
+                errorMsg.className = 'chat-message assistant';
+                errorMsg.textContent = 'Error: ' + e.message;
+                chatBox.appendChild(errorMsg);
+            }
+        }
+
+        function handleChatKeypress(event) {
+            if (event.key === 'Enter') {
+                sendChat();
+            }
+        }
+
+        async function startPlaidLink() {
+            const status = document.getElementById('plaidStatus');
+            status.innerHTML = '<div class="loading">Opening Plaid Link...</div>';
+
+            try {
+                const res = await fetch(`${API_BASE}/api/plaid/link-token`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: 'user_' + Math.random().toString(36).substr(2, 9) })
+                });
+
+                const data = await res.json();
+
+                if (!data.link_token) {
+                    status.innerHTML = `<div class="error">Plaid not configured. Set PLAID_CLIENT_ID and PLAID_SECRET in environment variables.</div>`;
+                    return;
+                }
+
+                // In production, open Plaid Link here
+                status.innerHTML = `<div class="error">Plaid Link not embedded yet. link_token: ${data.link_token}</div>`;
+            } catch (e) {
+                status.innerHTML = `<div class="error">Error: ${e.message}</div>`;
+            }
+        }
+
+        async function syncPlaid() {
+            const status = document.getElementById('plaidStatus');
+            status.innerHTML = '<div class="loading">Syncing...</div>';
+
+            try {
+                const res = await fetch(`${API_BASE}/api/plaid/sync`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await res.json();
+
+                if (data.error) {
+                    status.innerHTML = `<div class="error">${data.error}</div>`;
+                } else {
+                    status.innerHTML = `<div style="color: #10b981; margin-top: 12px;">✓ Synced ${data.accounts_synced} accounts, ${data.transactions_synced} transactions</div>`;
+                    loadStatus(); // Reload status
+                }
+            } catch (e) {
+                status.innerHTML = `<div class="error">Error: ${e.message}</div>`;
+            }
+        }
+
+        // Load on page open
+        loadStatus();
+        setInterval(loadStatus, 30000); // Refresh every 30 seconds
+    </script>
+</body>
+</html>

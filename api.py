@@ -6,10 +6,10 @@ Simple Flask API for Railway deployment.
 import json
 import os
 from datetime import datetime
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 from cfo import PersonalCFO
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder=None)
 
 # Use Railway's database path if available
 db_path = os.getenv('DATABASE_PATH', os.path.expanduser('~/.personal-cfo/finance.db'))
@@ -138,8 +138,6 @@ def root():
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
-
 # PLAID INTEGRATION ENDPOINTS
 @app.route('/api/plaid/link-token', methods=['POST'])
 def plaid_link_token():
@@ -268,3 +266,17 @@ Be concise but thorough. If they're asking about affordability, be clear about w
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# WEB DASHBOARD
+@app.route('/dashboard', methods=['GET'])
+def dashboard():
+    """Serve the web dashboard."""
+    from pathlib import Path
+    dashboard_path = Path(__file__).parent / 'frontend.html'
+    if dashboard_path.exists():
+        with open(dashboard_path, 'r') as f:
+            return f.read()
+    return jsonify({"error": "Dashboard not found"}), 404
+
+if __name__ == '__main__':
+    port = int(os.getenv('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)

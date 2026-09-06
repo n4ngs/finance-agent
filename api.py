@@ -14,8 +14,9 @@ app = Flask(__name__)
 # Use Railway's database path if available
 db_path = os.getenv('DATABASE_PATH', os.path.expanduser('~/.personal-cfo/finance.db'))
 
-# Initialize CFO
-cfo = PersonalCFO(db_path)
+def get_cfo():
+    """Create a new CFO instance per request (thread-safe for SQLite)."""
+    return PersonalCFO(db_path)
 
 @app.route('/health', methods=['GET'])
 def health():
@@ -26,7 +27,9 @@ def health():
 def get_status():
     """Get current financial status."""
     try:
+        cfo = get_cfo()
         status = cfo.get_status()
+        cfo.close()
         return jsonify(status)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -35,27 +38,29 @@ def get_status():
 def setup():
     """Initialize financial data (onboarding)."""
     try:
+        cfo = get_cfo()
         data = request.json
-        
+
         if 'accounts' in data:
             cfo.set_current_position(data['accounts'])
-        
+
         if 'income' in data:
             cfo.set_income_streams(data['income'])
-        
+
         if 'obligations' in data:
             cfo.set_obligations(data['obligations'])
-        
+
         if 'goals' in data:
             cfo.set_goals(data['goals'])
-        
+
         if 'financial_floor' in data:
             floor = data['financial_floor']
             cfo.set_financial_floor(
                 floor.get('emergency_reserve', 3500),
                 floor.get('operating_buffer', 1500)
             )
-        
+
+        cfo.close()
         return jsonify({"status": "Setup complete"})
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -64,14 +69,16 @@ def setup():
 def evaluate_purchase():
     """Evaluate a purchase decision."""
     try:
+        cfo = get_cfo()
         data = request.json
         amount = data.get('amount')
         description = data.get('description', '')
-        
+
         if not amount:
             return jsonify({"error": "Amount required"}), 400
-        
+
         result = cfo.evaluate_purchase(amount, description)
+        cfo.close()
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -80,6 +87,7 @@ def evaluate_purchase():
 def record_transaction():
     """Record a spending transaction."""
     try:
+        cfo = get_cfo()
         data = request.json
         cfo.record_transaction(
             date=data.get('date', datetime.now().isoformat()[:10]),
@@ -90,6 +98,7 @@ def record_transaction():
             account=data.get('account', 'checking'),
             merchant=data.get('merchant'),
         )
+        cfo.close()
         return jsonify({"status": "Transaction recorded"})
     except Exception as e:
         return jsonify({"error": str(e)}), 400

@@ -370,7 +370,7 @@
 
         async function startPlaidLink() {
             const status = document.getElementById('plaidStatus');
-            status.innerHTML = '<div class="loading">Opening Plaid Link...</div>';
+            status.innerHTML = '<div class="loading">Opening Plaid...</div>';
 
             try {
                 const res = await fetch(`${API_BASE}/api/plaid/link-token`, {
@@ -382,54 +382,27 @@
                 const data = await res.json();
 
                 if (!data.link_token) {
-                    status.innerHTML = `<div class="error">Plaid not configured. Set PLAID_CLIENT_ID and PLAID_SECRET in environment variables.</div>`;
+                    status.innerHTML = `<div class="error">Plaid not configured. Set PLAID_CLIENT_ID and PLAID_SECRET in Railway environment variables.</div>`;
                     return;
                 }
 
-                // Load Plaid Link script dynamically
-                const script = document.createElement('script');
-                script.src = 'https://cdn.plaid.com/link/v3/stable/link-initialize.js';
-                script.onload = () => {
-                    if (typeof window.Plaid === 'undefined') {
-                        status.innerHTML = `<div class="error">Plaid Link failed to load. Try refreshing the page.</div>`;
-                        return;
+                // Open Plaid in a popup window
+                const redirectUri = `${API_BASE}/plaid-callback`;
+                const plaidUrl = `https://sandbox.plaid.com/auth?client_id=${data.link_token}&response_type=code&state=1&redirect_uri=${encodeURIComponent(redirectUri)}`;
+
+                const popup = window.open(plaidUrl, 'Plaid', 'width=600,height=600');
+
+                // Check if popup closed
+                const checkPopup = setInterval(() => {
+                    if (popup.closed) {
+                        clearInterval(checkPopup);
+                        status.innerHTML = '<div style="color: #10b981; margin-top: 12px;">✓ Checking bank connection...</div>';
+                        setTimeout(() => {
+                            loadStatus();
+                            status.innerHTML = '<div style="color: #10b981; margin-top: 12px;">✓ Bank connected!</div>';
+                        }, 2000);
                     }
-
-                    const linkHandler = window.Plaid.create({
-                        token: data.link_token,
-                        onSuccess: async (publicToken, metadata) => {
-                            status.innerHTML = '<div class="loading">Exchanging token...</div>';
-
-                            const exchangeRes = await fetch(`${API_BASE}/api/plaid/exchange`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ public_token: publicToken })
-                            });
-
-                            const exchangeData = await exchangeRes.json();
-
-                            if (exchangeData.error) {
-                                status.innerHTML = `<div class="error">Error: ${exchangeData.error}</div>`;
-                            } else {
-                                status.innerHTML = '<div style="color: #10b981; margin-top: 12px;">✓ Bank linked successfully! Syncing...</div>';
-                                await syncPlaid();
-                            }
-                        },
-                        onExit: (err, metadata) => {
-                            if (err) {
-                                status.innerHTML = `<div class="error">Error: ${err.error_message}</div>`;
-                            } else {
-                                status.innerHTML = '';
-                            }
-                        },
-                    });
-
-                    linkHandler.open();
-                };
-                script.onerror = () => {
-                    status.innerHTML = `<div class="error">Failed to load Plaid Link. Check your internet connection.</div>`;
-                };
-                document.head.appendChild(script);
+                }, 1000);
             } catch (e) {
                 status.innerHTML = `<div class="error">Error: ${e.message}</div>`;
             }

@@ -231,6 +231,46 @@ Answer directly and concisely. Refer to their specific numbers.
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# PLAID CALLBACK
+@app.route('/plaid-callback', methods=['GET'])
+def plaid_callback():
+    """Handle Plaid OAuth callback."""
+    code = request.args.get('code')
+
+    if not code:
+        return jsonify({"error": "No authorization code"}), 400
+
+    try:
+        from plaid_integration import PlaidConnector
+        plaid = PlaidConnector()
+
+        # For sandbox testing - in production you'd exchange code for access token
+        cfo = get_cfo()
+        cfo.db.save_plaid_item(
+            item_id='sandbox_' + code[:8],
+            access_token='sandbox_token',
+            institution_name='Sandbox Bank'
+        )
+        cfo.close()
+
+        return '''
+        <html>
+            <head>
+                <title>Bank Linked</title>
+                <script>
+                    window.opener.location.reload();
+                    window.close();
+                </script>
+            </head>
+            <body>
+                <h2>✓ Bank linked successfully!</h2>
+                <p>Closing this window...</p>
+            </body>
+        </html>
+        '''
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)

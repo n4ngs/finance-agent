@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Personal CFO - Financial Dashboard</title>
-    <script src="https://cdn.plaid.com/link/v3/stable/link-initialize.js"></script>
     <style>
         * {
             margin: 0;
@@ -387,38 +386,50 @@
                     return;
                 }
 
-                // Open Plaid Link with the token
-                const linkHandler = Plaid.create({
-                    token: data.link_token,
-                    onSuccess: async (publicToken, metadata) => {
-                        status.innerHTML = '<div class="loading">Exchanging token...</div>';
+                // Load Plaid Link script dynamically
+                const script = document.createElement('script');
+                script.src = 'https://cdn.plaid.com/link/v3/stable/link-initialize.js';
+                script.onload = () => {
+                    if (typeof window.Plaid === 'undefined') {
+                        status.innerHTML = `<div class="error">Plaid Link failed to load. Try refreshing the page.</div>`;
+                        return;
+                    }
 
-                        // Exchange public token for access token
-                        const exchangeRes = await fetch(`${API_BASE}/api/plaid/exchange`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ public_token: publicToken })
-                        });
+                    const linkHandler = window.Plaid.create({
+                        token: data.link_token,
+                        onSuccess: async (publicToken, metadata) => {
+                            status.innerHTML = '<div class="loading">Exchanging token...</div>';
 
-                        const exchangeData = await exchangeRes.json();
+                            const exchangeRes = await fetch(`${API_BASE}/api/plaid/exchange`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ public_token: publicToken })
+                            });
 
-                        if (exchangeData.error) {
-                            status.innerHTML = `<div class="error">Error: ${exchangeData.error}</div>`;
-                        } else {
-                            status.innerHTML = '<div style="color: #10b981; margin-top: 12px;">✓ Bank linked successfully! Syncing...</div>';
-                            await syncPlaid();
-                        }
-                    },
-                    onExit: (err, metadata) => {
-                        if (err) {
-                            status.innerHTML = `<div class="error">Error: ${err.error_message}</div>`;
-                        } else {
-                            status.innerHTML = '';
-                        }
-                    },
-                });
+                            const exchangeData = await exchangeRes.json();
 
-                linkHandler.open();
+                            if (exchangeData.error) {
+                                status.innerHTML = `<div class="error">Error: ${exchangeData.error}</div>`;
+                            } else {
+                                status.innerHTML = '<div style="color: #10b981; margin-top: 12px;">✓ Bank linked successfully! Syncing...</div>';
+                                await syncPlaid();
+                            }
+                        },
+                        onExit: (err, metadata) => {
+                            if (err) {
+                                status.innerHTML = `<div class="error">Error: ${err.error_message}</div>`;
+                            } else {
+                                status.innerHTML = '';
+                            }
+                        },
+                    });
+
+                    linkHandler.open();
+                };
+                script.onerror = () => {
+                    status.innerHTML = `<div class="error">Failed to load Plaid Link. Check your internet connection.</div>`;
+                };
+                document.head.appendChild(script);
             } catch (e) {
                 status.innerHTML = `<div class="error">Error: ${e.message}</div>`;
             }
